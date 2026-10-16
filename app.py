@@ -49,6 +49,7 @@ URL_VENTAS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?
 URL_USADOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=USADO26"
 URL_TPA26 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=TPA26"
 URL_MYSTERY = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=Mystery26"
+URL_BOLETOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=Boletos%20en%20DISFRUTA%20TU%20TOYOTA"
 
 SHEET_ID_TPA = "1-kBeBdC60rBwsV-rUTlVLSnr2kkI4eJzvW0mA_IvtBg"
 URL_TPA = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_TPA}/gviz/tq?tqx=out:csv&sheet=Base%20Datos%20Actualizada"
@@ -405,7 +406,7 @@ if not df_ventas_raw.empty:
                         c_info3.markdown(f"**💬 Comentario:** {comentario_texto}")
                     st.markdown("---")
 
-    # --- PESTAÑA 2: RANKING DE VENDEDORES 0KM – (TASA) ---
+# --- PESTAÑA 2: RANKING DE VENDEDORES 0KM – (TASA) ---
     with tab_ranking:
         st.markdown('<div class="sticky-filters">', unsafe_allow_html=True)
         st.write("#### 🔍 Filtros de Ranking (0km)")
@@ -458,6 +459,78 @@ if not df_ventas_raw.empty:
                 margin=dict(l=150, r=50, t=40, b=40)
             )
             st.plotly_chart(fig_ranking, use_container_width=True)
+
+        st.markdown("---")
+        
+        # ---------------------------------------------------------
+        # NUEVA SECCIÓN: % DE ENCUESTAS POR ASESOR (HOJA BOLETOS)
+        # ---------------------------------------------------------
+        st.write("### 📊 Porcentaje de Encuestas por Asesor (Boletos Disfruta tu Toyota)")
+        
+        if 'df_boletos_raw' in locals() and not df_boletos_raw.empty and len(df_boletos_raw.columns) >= 11:
+            # Identificamos las columnas por su índice (basado en instrucciones, 0-indexed)
+            col_fecha_b = df_boletos_raw.columns[4]   # Columna E
+            col_asesor_b = df_boletos_raw.columns[6]  # Columna G
+            col_suc_b = df_boletos_raw.columns[7]     # Columna H
+            col_estado_b = df_boletos_raw.columns[10] # Columna K
+            
+            df_bol_proc = df_boletos_raw.copy()
+            df_bol_proc = df_bol_proc.dropna(subset=[col_estado_b, col_asesor_b])
+            df_bol_proc[col_estado_b] = df_bol_proc[col_estado_b].astype(str).str.strip().str.upper()
+            
+            # Filtros dinámicos para esta sección
+            f_bol1, f_bol2 = st.columns(2)
+            sucursales_bol = sorted([str(s) for s in df_bol_proc[col_suc_b].dropna().unique() if str(s).strip() != ''])
+            with f_bol1:
+                suc_sel_bol = st.multiselect("Filtrar por Sucursal:", sucursales_bol, default=sucursales_bol, key="f_suc_bol")
+            
+            # Filtrar por sucursal primero para actualizar la lista de asesores
+            df_bol_filt = df_bol_proc[df_bol_proc[col_suc_b].astype(str).isin(suc_sel_bol)] if suc_sel_bol else df_bol_proc.copy()
+            
+            asesores_bol = sorted([str(a) for a in df_bol_filt[col_asesor_b].dropna().unique() if str(a).strip() != ''])
+            with f_bol2:
+                asesor_sel_bol = st.multiselect("Filtrar por Asesor:", asesores_bol, default=asesores_bol, key="f_ase_bol")
+                
+            # Filtrar por asesor
+            if asesor_sel_bol:
+                df_bol_filt = df_bol_filt[df_bol_filt[col_asesor_b].astype(str).isin(asesor_sel_bol)]
+
+            if not df_bol_filt.empty:
+                # Agrupar y calcular porcentajes
+                df_bol_agrupado = df_bol_filt.groupby([col_asesor_b, col_estado_b]).size().reset_index(name='Cantidad')
+                df_totales = df_bol_filt.groupby(col_asesor_b).size().reset_index(name='Total')
+                df_bol_agrupado = pd.merge(df_bol_agrupado, df_totales, on=col_asesor_b)
+                df_bol_agrupado['Porcentaje'] = (df_bol_agrupado['Cantidad'] / df_bol_agrupado['Total']) * 100
+                
+                # Asignar colores: OK en verde, SE en rojo (o gris según tu preferencia)
+                color_map_bol = {'OK': '#2ecc71', 'SE': '#e74c3c'}
+                
+                fig_bol = px.bar(
+                    df_bol_agrupado, 
+                    x=col_asesor_b, 
+                    y='Porcentaje', 
+                    color=col_estado_b,
+                    text=df_bol_agrupado.apply(lambda row: f"{row['Cantidad']} ({row['Porcentaje']:.1f}%)", axis=1),
+                    color_discrete_map=color_map_bol,
+                    title="Proporción de Boletos con/sin Encuesta por Asesor",
+                    labels={col_asesor_b: "Asesor", "Porcentaje": "Porcentaje (%)", col_estado_b: "Estado Encuesta"}
+                )
+                
+                fig_bol.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12))
+                fig_bol.update_layout(
+                    barmode='stack', # Gráfico apilado
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color='#333333'),
+                    yaxis=dict(title="Porcentaje (%)", range=[0, 105], showgrid=True, gridcolor='#e6e6e6'),
+                    xaxis=dict(title="Asesor", tickangle=-45),
+                    margin=dict(t=50, b=100)
+                )
+                st.plotly_chart(fig_bol, use_container_width=True)
+                
+            else:
+                st.info("No hay datos suficientes para mostrar el gráfico con los filtros seleccionados.")
+        else:
+            st.warning("No se pudo cargar la hoja 'Boletos en DISFRUTA TU TOYOTA'. Verifica la URL o que el documento tenga al menos 11 columnas.")
 
     # --- PESTAÑA 3: COMISIONES (0KM & TPA) ---
     with tab_comisiones:
