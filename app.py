@@ -870,10 +870,9 @@ if not df_ventas_raw.empty:
                     df_suc = df_nps_valid_t[df_nps_valid_t[col_suc_t].astype(str) == suc]
                     nps_suc = calcular_nps_texto(df_suc['Estado_NPS'])
 
-                  with relojes_tpa_cols[idx]:
+                 with relojes_tpa_cols[idx]:
                         renderizar_cabecera_reloj(f"NPS - {suc}", f"Objetivo: {OBJETIVO_NPS_TPA}%")
-                        # Sumamos un key único usando el index
-                        st.plotly_chart(crear_reloj(nps_suc, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True, key=f"reloj_tpa_{idx}")
+                        st.plotly_chart(crear_reloj(nps_suc, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True)
 
                     with barras_tpa_cols[idx]:
                         conteo_suc = df_suc['Estado_NPS'].value_counts().reindex(['Detractor', 'Neutro', 'Promotor']).fillna(0).reset_index()
