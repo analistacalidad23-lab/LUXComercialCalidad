@@ -45,14 +45,34 @@ st.sidebar.markdown("---")
 
 # 2. Conexión de Datos (Hojas de Google)
 SHEET_ID_VENTAS = "1PGoOlFTN2WuuiEqRk0KPrcLZL6pEcFVeNWo35shsUSA"
-URL_VENTAS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=VENTAS26"
-URL_USADOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=USADO26"
-URL_TPA26 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=TPA26"
-URL_MYSTERY = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=Mystery26"
-URL_BOLETOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=Boletos%20en%20DISFRUTA%20TU%20TOYOTA"
-SHEET_ID_TPA = "1-kBeBdC60rBwsV-rUTlVLSnr2kkI4eJzvW0mA_IvtBg"
-URL_TPA = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_TPA}/gviz/tq?tqx=out:csv&sheet=Base%20Datos%20Actualizada"
 
+# Usamos export?format=csv&gid= para asegurar que no se rompan por nombres con espacios
+URL_VENTAS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/export?format=csv&gid=1119560410"
+URL_USADOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/export?format=csv&gid=181518536"
+URL_TPA26 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/export?format=csv&gid=1189312154"
+URL_MYSTERY = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/export?format=csv&gid=963595221"
+URL_BOLETOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/export?format=csv&gid=474776602"
+
+SHEET_ID_TPA = "1-kBeBdC60rBwsV-rUTlVLSnr2kkI4eJzvW0mA_IvtBg"
+URL_TPA = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_TPA}/export?format=csv&gid=0"
+
+@st.cache_data(ttl=60)
+def cargar_datos(url):
+    try:
+        df = pd.read_csv(url)
+        df.columns = [str(col).strip() for col in df.columns]
+        return df
+    except Exception as e:
+        st.error(f"Error al conectar con la base de datos: {e}")
+        return pd.DataFrame()
+
+# Cargar los dataframes
+df_ventas_raw = cargar_datos(URL_VENTAS)
+df_usados_raw = cargar_datos(URL_USADOS)
+df_tpa_raw = cargar_datos(URL_TPA)
+df_tpa26_raw = cargar_datos(URL_TPA26)
+df_mystery_raw = cargar_datos(URL_MYSTERY)
+df_boletos_raw = cargar_datos(URL_BOLETOS)
 @st.cache_data(ttl=60)
 def cargar_datos(url):
     try:
@@ -850,9 +870,10 @@ if not df_ventas_raw.empty:
                     df_suc = df_nps_valid_t[df_nps_valid_t[col_suc_t].astype(str) == suc]
                     nps_suc = calcular_nps_texto(df_suc['Estado_NPS'])
 
-                    with relojes_tpa_cols[idx]:
+                  with relojes_tpa_cols[idx]:
                         renderizar_cabecera_reloj(f"NPS - {suc}", f"Objetivo: {OBJETIVO_NPS_TPA}%")
-                        st.plotly_chart(crear_reloj(nps_suc, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True)
+                        # Sumamos un key único usando el index
+                        st.plotly_chart(crear_reloj(nps_suc, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True, key=f"reloj_tpa_{idx}")
 
                     with barras_tpa_cols[idx]:
                         conteo_suc = df_suc['Estado_NPS'].value_counts().reindex(['Detractor', 'Neutro', 'Promotor']).fillna(0).reset_index()
