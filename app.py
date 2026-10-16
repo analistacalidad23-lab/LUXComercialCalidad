@@ -773,13 +773,14 @@ if not df_ventas_raw.empty:
                 relojes_tpa_cols = st.columns(len(sucursales_validas))
                 barras_tpa_cols = st.columns(len(sucursales_validas))
 
-                for idx, suc in enumerate(sucursales_validas):
+       for idx, suc in enumerate(sucursales_validas):
                     df_suc = df_nps_valid_t[df_nps_valid_t[col_suc_t].astype(str) == suc]
                     nps_suc = calcular_nps_texto(df_suc['Estado_NPS'])
 
                     with relojes_tpa_cols[idx]:
                         renderizar_cabecera_reloj(f"NPS - {suc}", f"Objetivo: {OBJETIVO_NPS_TPA}%")
-                        st.plotly_chart(crear_reloj(nps_suc, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True)
+                        # Se agrega el parámetro key con un identificador único
+                        st.plotly_chart(crear_reloj(nps_suc, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True, key=f"reloj_tpa_{idx}_{suc}")
 
                     with barras_tpa_cols[idx]:
                         conteo_suc = df_suc['Estado_NPS'].value_counts().reindex(['Detractor', 'Neutro', 'Promotor']).fillna(0).reset_index()
@@ -798,7 +799,9 @@ if not df_ventas_raw.empty:
                             yaxis=dict(title=dict(text="Tipo de cliente", font=dict(color='#333333')), tickfont=dict(color='#333333'))
                         )
                         fig_bar_tpa.update_traces(textposition='outside', textfont=dict(color='#333333'))
-                        st.plotly_chart(fig_bar_tpa, use_container_width=True)
+                        
+                        # Se agrega el parámetro key con un identificador único
+                        st.plotly_chart(fig_bar_tpa, use_container_width=True, key=f"barras_tpa_{idx}_{suc}")
 
                         with st.expander(f"Ver informe ({suc})"):
                             columnas_tabla_t = [col_cliente_t, 'Comentario_Cliente', col_vend_t, 'Mes_Filtro', 'Estado_NPS']
@@ -812,6 +815,14 @@ if not df_ventas_raw.empty:
                                 'Mes_Filtro': 'Mes',
                                 'Estado_NPS': 'Clasificación'
                             })
+
+                            def color_clasificacion_t(val):
+                                if val == 'Detractor': return 'color: #e74c3c; font-weight: bold;'
+                                elif val == 'Promotor': return 'color: #2ecc71; font-weight: bold;'
+                                elif val == 'Neutro': return 'color: #f1c40f; font-weight: bold;'
+                                return ''
+
+                            st.dataframe(df_tabla_nps_t.style.map(color_clasificacion_t, subset=['Clasificación']), use_container_width=True, hide_index=True)
 
                             def color_clasificacion_t(val):
                                 if val == 'Detractor': return 'color: #e74c3c; font-weight: bold;'
