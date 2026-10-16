@@ -50,7 +50,6 @@ URL_USADOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?
 URL_TPA26 = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=TPA26"
 URL_MYSTERY = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=Mystery26"
 URL_BOLETOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_VENTAS}/gviz/tq?tqx=out:csv&sheet=Boletos%20en%20DISFRUTA%20TU%20TOYOTA"
-
 SHEET_ID_TPA = "1-kBeBdC60rBwsV-rUTlVLSnr2kkI4eJzvW0mA_IvtBg"
 URL_TPA = f"https://docs.google.com/spreadsheets/d/{SHEET_ID_TPA}/gviz/tq?tqx=out:csv&sheet=Base%20Datos%20Actualizada"
 
