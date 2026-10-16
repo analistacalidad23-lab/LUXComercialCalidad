@@ -14,19 +14,21 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    .main-title { font-size: 28px; font-weight: bold; color: #3498db; margin-bottom: 5px; }
-    .subtitle { font-size: 14px; color: #a0a0a0; margin-bottom: 25px; }
+    /* Estilos adaptados al Modo Claro nativo de Streamlit */
+    .main-title { font-size: 28px; font-weight: bold; color: #1f77b4; margin-bottom: 5px; border-bottom: 2px solid #1f77b4; padding-bottom: 5px;}
+    .subtitle { font-size: 15px; color: #555555; margin-bottom: 25px; font-weight: 500;}
     
-    /* Estilo para fijar los filtros en la parte superior al hacer scroll */
+    /* Panel superior de filtros (estilo tarjeta clara) */
     .sticky-filters {
         position: sticky;
         top: 0px;
         z-index: 999;
-        background-color: #0e1117; /* Fondo adaptado a modo oscuro */
-        padding: 15px 10px;
-        border-bottom: 1px solid #262730;
+        background-color: #ffffff;
+        padding: 15px 15px;
+        border: 1px solid #e6e6e6;
         margin-bottom: 20px;
-        border-radius: 5px;
+        border-radius: 6px;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.05);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -101,19 +103,34 @@ def calcular_nps_texto(serie_estado):
     if total_validos == 0: return np.nan
     return (promotores - detractores) / total_validos * 100.0
 
-def crear_reloj(valor, titulo, objetivo, max_val, color_ok="#2ecc71", color_bad="#e74c3c"):
+# NUEVA ESTRUCTURA VISUAL DE RELOJES
+def renderizar_cabecera_reloj(titulo, subtitulo):
+    st.markdown(f'''
+        <div style="background-color:#ffffff; padding:10px; border:1px solid #e6e6e6; border-radius:8px; text-align:center; box-shadow:0px 2px 4px rgba(0,0,0,0.05); margin-bottom:-10px; z-index:1; position:relative;">
+            <span style="font-size:16px; font-weight:bold; color:#333333;">{titulo}</span><br>
+            <span style="font-size:14px; font-weight:bold; color:#1f77b4;">{subtitulo}</span>
+        </div>
+    ''', unsafe_allow_html=True)
+
+def crear_reloj(valor, objetivo, max_val, min_val=0, color_ok="#2ecc71", color_bad="#e74c3c", es_nps=False):
     valor = 0 if pd.isna(valor) else valor
     color_actual = color_ok if valor >= objetivo else color_bad
+    sufijo = "%" if es_nps else ""
+    
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta", value=valor,
-        number={'suffix': "%" if "NPS" in titulo else "", 'font': {'size': 40, 'color': color_actual}},
+        number={'suffix': sufijo, 'font': {'size': 32, 'color': color_actual}},
         delta={'reference': objetivo, 'increasing': {'color': color_ok}, 'decreasing': {'color': color_bad}},
-        title={'text': titulo, 'font': {'size': 18}},
-        gauge={'axis': {'range': [-100 if "NPS" in titulo else 0, max_val], 'tickwidth': 1}, 'bar': {'color': color_actual},
-               'steps': [{'range': [-100 if "NPS" in titulo else 0, objetivo], 'color': 'rgba(255,255,255,0.1)'}, {'range': [objetivo, max_val], 'color': 'rgba(255,255,255,0.2)'}],
-               'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': objetivo}}
+        gauge={'axis': {'range': [min_val, max_val], 'tickwidth': 1, 'tickcolor': '#333333'}, 
+               'bar': {'color': color_actual},
+               'bgcolor': "white",
+               'borderwidth': 1,
+               'bordercolor': "#cccccc",
+               'steps': [{'range': [min_val, objetivo], 'color': 'rgba(0,0,0,0.05)'}, 
+                         {'range': [objetivo, max_val], 'color': 'rgba(66, 139, 202, 0.1)'}],
+               'threshold': {'line': {'color': "#333333", 'width': 3}, 'thickness': 0.75, 'value': objetivo}}
     ))
-    fig.update_layout(height=300, margin=dict(l=10, r=10, t=40, b=10), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+    fig.update_layout(height=160, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", font={'color': "#333333"})
     return fig
 
 # Cargar los dataframes
@@ -220,7 +237,7 @@ if not df_ventas_raw.empty:
             df_tpa26_proc['Estado_NPS'] = df_tpa26_proc['Nota_Num'].apply(obtener_estado_nps)
             df_tpa26_proc['Comentario_Cliente'] = df_tpa26_proc[col_coment_t26].fillna("Sin comentarios")
 
-    # 5. Creación de Pestañas con los nuevos títulos solicitados
+    # 5. Creación de Pestañas
     tab_convencional, tab_ranking, tab_comisiones, tab_usados, tab_tpa, tab_tpa26, tab_mystery, tab_criterios = st.tabs([
         "Venta Convencional 0km - TASA", 
         "Ranking de vendedores 0km – (TASA)", 
@@ -258,8 +275,12 @@ if not df_ventas_raw.empty:
         nps_actual = calcular_nps(df_filtrado[col_nps])
 
         col1, col2 = st.columns(2)
-        with col1: st.plotly_chart(crear_reloj(ssi_actual, "Indicador SSI (4,5 ptos) - Objetivo: 95.6", OBJETIVO_SSI, 100), use_container_width=True)
-        with col2: st.plotly_chart(crear_reloj(nps_actual, "Indicador NPS (1,2 ptos) - Objetivo: 87%", OBJETIVO_NPS, 100), use_container_width=True)
+        with col1: 
+            renderizar_cabecera_reloj("Indicador SSI 0km", f"4,5 ptos | Objetivo: {OBJETIVO_SSI}")
+            st.plotly_chart(crear_reloj(ssi_actual, OBJETIVO_SSI, 100, min_val=0, es_nps=False), use_container_width=True)
+        with col2: 
+            renderizar_cabecera_reloj("Indicador NPS 0km", f"1,2 ptos | Objetivo: {OBJETIVO_NPS}%")
+            st.plotly_chart(crear_reloj(nps_actual, OBJETIVO_NPS, 100, min_val=-100, es_nps=True), use_container_width=True)
 
         st.markdown("---")
         st.write(f"### Desempeño Mensual - Boca de Venta: {boca_sel}")
@@ -277,32 +298,38 @@ if not df_ventas_raw.empty:
             
             fig_evolucion.add_trace(go.Bar(
                 x=df_tabla_mensual['Mes'], y=df_tabla_mensual['Q encuestas'], 
-                name='Cant. Encuestas', marker_color='rgba(169, 169, 169, 0.3)', 
+                name='Cant. Encuestas', marker_color='rgba(169, 169, 169, 0.4)', 
                 yaxis='y2', text=df_tabla_mensual['Q encuestas'].apply(lambda x: f"<b>{x}</b>"), textposition='auto',
-                textfont=dict(color='white', size=12)
+                textfont=dict(color='#333333', size=12)
             ))
             fig_evolucion.add_trace(go.Scatter(
                 x=df_tabla_mensual['Mes'], y=df_tabla_mensual['SSI Puro'], 
-                mode='lines+markers+text', name='SSI Puro', line=dict(color='#3498db', width=3), 
+                mode='lines+markers+text', name='SSI Puro', line=dict(color='#1f77b4', width=3), 
                 text=df_tabla_mensual['SSI Puro'].apply(lambda x: f"<b>{x:.1f}</b>"), textposition='top center',
-                textfont=dict(color='white', size=12)
+                textfont=dict(color='#333333', size=12)
             ))
             fig_evolucion.add_trace(go.Scatter(
                 x=df_tabla_mensual['Mes'], y=df_tabla_mensual['NPS dealer'], 
                 mode='lines+markers+text', name='NPS dealer', line=dict(color='#2ecc71', width=3), 
                 text=df_tabla_mensual['NPS dealer'].apply(lambda x: f"<b>{x:.1f}%</b>" if pd.notna(x) else ""), textposition='bottom center',
-                textfont=dict(color='white', size=12)
+                textfont=dict(color='#333333', size=12)
             ))
             
+            # --- LÍNEAS DE OBJETIVO ---
+            fig_evolucion.add_hline(y=OBJETIVO_SSI, line_dash="dot", line_color="#E3000F", annotation_text=f"Obj. SSI ({OBJETIVO_SSI})", annotation_position="top left", annotation_font=dict(color="#E3000F", size=13))
+            fig_evolucion.add_hline(y=OBJETIVO_NPS, line_dash="dot", line_color="#E3000F", annotation_text=f"Obj. NPS ({OBJETIVO_NPS}%)", annotation_position="bottom right", annotation_font=dict(color="#E3000F", size=13))
+
             y2_max = max(10, df_tabla_mensual['Q encuestas'].max() * 1.5)
             y2_min = - (100 / 110) * y2_max
             
             fig_evolucion.update_layout(
-                title="Evolución de SSI, NPS y Volumen de Encuestas",
-                yaxis=dict(title="Puntaje / Porcentaje", range=[-100, 110], zeroline=True, zerolinecolor='rgba(231, 76, 60, 0.5)', zerolinewidth=2),
-                yaxis2=dict(title="Cantidad de Encuestas", overlaying='y', side='right', range=[y2_min, y2_max], showgrid=False, zeroline=False),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                title=dict(text="Evolución de SSI, NPS y Volumen de Encuestas", font=dict(color='#333333', size=20)),
+                yaxis=dict(title=dict(text="Puntaje / Porcentaje", font=dict(color='#333333')), range=[-100, 110], zeroline=True, zerolinecolor='#cccccc', zerolinewidth=2, tickfont=dict(color='#333333'), showgrid=True, gridcolor='#e6e6e6'),
+                yaxis2=dict(title=dict(text="Cantidad de Encuestas", font=dict(color='#333333')), overlaying='y', side='right', range=[y2_min, y2_max], showgrid=False, zeroline=False, tickfont=dict(color='#333333')),
+                xaxis=dict(tickfont=dict(color='#333333')),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color='#333333')),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(t=80, b=40, l=40, r=40)
             )
             st.plotly_chart(fig_evolucion, use_container_width=True)
 
@@ -335,7 +362,7 @@ if not df_ventas_raw.empty:
                 conteo_global_0km, names='Estado', values='Cantidad', title='Distribución General de NPS',
                 color='Estado', color_discrete_map={'Promotor': '#2ecc71', 'Neutro': '#f1c40f', 'Detractor': '#e74c3c'}, hole=0.4
             )
-            fig_pie_0km.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color='white'))
+            fig_pie_0km.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color='#333333'), title=dict(font=dict(size=18)))
             pie_col1.plotly_chart(fig_pie_0km, use_container_width=True)
             
             # --- 2. GRÁFICO POR SUCURSAL EN BARRAS (0km) ---
@@ -345,7 +372,13 @@ if not df_ventas_raw.empty:
                 title='Distribución de NPS por Sucursal', barmode='stack',
                 color_discrete_map={'Promotor': '#2ecc71', 'Neutro': '#f1c40f', 'Detractor': '#e74c3c'}
             )
-            fig_bar_suc_0km.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color='white'), xaxis_title="Sucursal", yaxis_title="Cantidad")
+            fig_bar_suc_0km.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", 
+                font=dict(color='#333333'), 
+                xaxis=dict(title=dict(text="Sucursal"), tickfont=dict(color="#333333")), 
+                yaxis=dict(title=dict(text="Cantidad"), tickfont=dict(color="#333333")), 
+                title=dict(font=dict(size=18))
+            )
             pie_col2.plotly_chart(fig_bar_suc_0km, use_container_width=True)
             
             st.write("#### 📋 Registro Detallado de Clientes con Comentarios")
@@ -401,14 +434,14 @@ if not df_ventas_raw.empty:
                 y=df_resumen['Vendedor'], 
                 x=df_resumen['Encuestas'], 
                 name='Cant. Encuestas', 
-                marker_color='#3498db', 
+                marker_color='#1f77b4', 
                 orientation='h',
                 text=df_resumen.apply(
                     lambda r: f"   <b>{int(r['Encuestas'])}</b> encuestas   |   <b>SSI:</b> {r['SSI_Promedio']:.1f}   |   <b>NPS:</b> {r['NPS']:.1f}%" if pd.notna(r['NPS']) else f"   <b>{int(r['Encuestas'])}</b> encuestas   |   <b>SSI:</b> {r['SSI_Promedio']:.1f}   |   <b>NPS:</b> N/D", 
                     axis=1
                 ),
                 textposition='outside', 
-                textfont=dict(color='white', size=14)
+                textfont=dict(color='#333333', size=14)
             ))
             
             max_enc = df_resumen['Encuestas'].max()
@@ -417,11 +450,11 @@ if not df_ventas_raw.empty:
             altura_dinamica = max(400, len(df_resumen) * 45)
 
             fig_ranking.update_layout(
-                yaxis_title="Vendedor", 
-                xaxis=dict(title="Volumen de Encuestas", range=[0, x_max_rank], showgrid=True, gridcolor='rgba(128,128,128,0.2)'), 
+                xaxis=dict(title=dict(text="Volumen de Encuestas", font=dict(color='#333333')), range=[0, x_max_rank], showgrid=True, gridcolor='#e6e6e6', tickfont=dict(color='#333333')), 
+                yaxis=dict(title=dict(text="Vendedor", font=dict(color='#333333')), tickfont=dict(color='#333333')),
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 height=altura_dinamica,
-                margin=dict(l=150, r=50)
+                margin=dict(l=150, r=50, t=40, b=40)
             )
             st.plotly_chart(fig_ranking, use_container_width=True)
 
@@ -456,7 +489,7 @@ if not df_ventas_raw.empty:
                 cant_encuestas, ssi_promedio, atencion_promedio = len(grupo), grupo['SSI_Num'].mean(), grupo[col_atencion_vend].mean()
                 if pd.isna(atencion_promedio) or cant_encuestas == 0: comision = 0.00
                 elif atencion_promedio*10 < 95.5: comision = -0.05
-                else: comision = 0.01
+                else: comision = 0.1
                 datos_comision.append({
                     'Vendedor': vend, 'Cantidad de Encuestas': cant_encuestas,
                     'Atención del Vendedor (x10)': (atencion_promedio * 10 if pd.notna(atencion_promedio) else np.nan),
@@ -494,7 +527,7 @@ if not df_ventas_raw.empty:
                 comision = 0.00
                 if pd.notna(nps_vendedor):
                     if nps_vendedor >= 85.0:
-                        comision = 0.01
+                        comision = 0.1
                     else:
                         comision = -0.05
                         
@@ -569,8 +602,12 @@ if not df_ventas_raw.empty:
             
             st.write("#### ⏱️ Estado Actual vs Objetivos UCT")
             cu1, cu2 = st.columns(2)
-            with cu1: st.plotly_chart(crear_reloj(ssi_uct_actual, "SSI UCT (0,8 ptos) - Objetivo: 94.5", OBJ_SSI_UCT, 100), use_container_width=True)
-            with cu2: st.plotly_chart(crear_reloj(nps_uct_actual, "NPS UCT (0,8 ptos) - Objetivo: 89%", OBJ_NPS_UCT, 100), use_container_width=True)
+            with cu1: 
+                renderizar_cabecera_reloj("SSI UCT", f"0,8 ptos | Objetivo: {OBJ_SSI_UCT}")
+                st.plotly_chart(crear_reloj(ssi_uct_actual, OBJ_SSI_UCT, 100, min_val=0, es_nps=False), use_container_width=True)
+            with cu2: 
+                renderizar_cabecera_reloj("NPS UCT", f"0,8 ptos | Objetivo: {OBJ_NPS_UCT}%")
+                st.plotly_chart(crear_reloj(nps_uct_actual, OBJ_NPS_UCT, 100, min_val=-100, es_nps=True), use_container_width=True)
             
             st.write("#### 📊 Evolución de los 5 Principales Indicadores")
             if top_5_cols:
@@ -589,32 +626,38 @@ if not df_ventas_raw.empty:
                     fig_evo_u = go.Figure()
                     fig_evo_u.add_trace(go.Bar(
                         x=df_res_u['Mes'], y=df_res_u['Q encuestas'], 
-                        name='Cant. Encuestas', marker_color='rgba(169, 169, 169, 0.3)', 
+                        name='Cant. Encuestas', marker_color='rgba(169, 169, 169, 0.4)', 
                         yaxis='y2', text=df_res_u['Q encuestas'].apply(lambda x: f"<b>{x}</b>"), textposition='auto',
-                        textfont=dict(color='white', size=12)
+                        textfont=dict(color='#333333', size=12)
                     ))
                     fig_evo_u.add_trace(go.Scatter(
                         x=df_res_u['Mes'], y=df_res_u['SSI UCT'], 
-                        mode='lines+markers+text', name='SSI UCT', line=dict(color='#3498db', width=3), 
+                        mode='lines+markers+text', name='SSI UCT', line=dict(color='#1f77b4', width=3), 
                         text=df_res_u['SSI UCT'].apply(lambda x: f"<b>{x:.1f}</b>"), textposition='top center',
-                        textfont=dict(color='white', size=12)
+                        textfont=dict(color='#333333', size=12)
                     ))
                     fig_evo_u.add_trace(go.Scatter(
                         x=df_res_u['Mes'], y=df_res_u['NPS UCT'], 
                         mode='lines+markers+text', name='NPS UCT', line=dict(color='#2ecc71', width=3), 
                         text=df_res_u['NPS UCT'].apply(lambda x: f"<b>{x:.1f}%</b>" if pd.notna(x) else ""), textposition='bottom center',
-                        textfont=dict(color='white', size=12)
+                        textfont=dict(color='#333333', size=12)
                     ))
                     
+                    # --- LÍNEAS DE OBJETIVO ---
+                    fig_evo_u.add_hline(y=OBJ_SSI_UCT, line_dash="dot", line_color="#E3000F", annotation_text=f"Obj. SSI ({OBJ_SSI_UCT})", annotation_position="top left", annotation_font=dict(color="#E3000F", size=13))
+                    fig_evo_u.add_hline(y=OBJ_NPS_UCT, line_dash="dot", line_color="#E3000F", annotation_text=f"Obj. NPS ({OBJ_NPS_UCT}%)", annotation_position="bottom right", annotation_font=dict(color="#E3000F", size=13))
+
                     y2_max_u = max(10, df_res_u['Q encuestas'].max() * 1.5)
                     y2_min_u = - (100 / 110) * y2_max_u
 
                     fig_evo_u.update_layout(
-                        title="Evolución de SSI, NPS y Volumen de Encuestas (UCT)",
-                        yaxis=dict(title="Puntaje / Porcentaje", range=[-100, 110], zeroline=True, zerolinecolor='rgba(231, 76, 60, 0.5)', zerolinewidth=2),
-                        yaxis2=dict(title="Cantidad de Encuestas", overlaying='y', side='right', range=[y2_min_u, y2_max_u], showgrid=False, zeroline=False),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                        title=dict(text="Evolución de SSI, NPS y Volumen de Encuestas (UCT)", font=dict(color='#333333', size=20)),
+                        yaxis=dict(title=dict(text="Puntaje / Porcentaje", font=dict(color='#333333')), range=[-100, 110], zeroline=True, zerolinecolor='#cccccc', zerolinewidth=2, tickfont=dict(color='#333333'), showgrid=True, gridcolor='#e6e6e6'),
+                        yaxis2=dict(title=dict(text="Cantidad de Encuestas", font=dict(color='#333333')), overlaying='y', side='right', range=[y2_min_u, y2_max_u], showgrid=False, zeroline=False, tickfont=dict(color='#333333')),
+                        xaxis=dict(tickfont=dict(color='#333333')),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color='#333333')),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                        margin=dict(t=80, b=40, l=40, r=40)
                     )
                     st.plotly_chart(fig_evo_u, use_container_width=True)
 
@@ -641,14 +684,13 @@ if not df_ventas_raw.empty:
                     # Gráfico de torta centrado (sin columnas)
                     pie_u1, pie_u2, pie_u3 = st.columns([1, 2, 1])
                     
-                    # --- 1. GRÁFICO GLOBAL DE TORA (UCT) ---
                     conteo_global_uct = df_nps_valid_u['Estado_NPS'].value_counts().reset_index()
                     conteo_global_uct.columns = ['Estado', 'Cantidad']
                     fig_pie_uct = px.pie(
                         conteo_global_uct, names='Estado', values='Cantidad', title='Distribución General de NPS (UCT)',
                         color='Estado', color_discrete_map={'Promotor': '#2ecc71', 'Neutro': '#f1c40f', 'Detractor': '#e74c3c'}, hole=0.4
                     )
-                    fig_pie_uct.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color='white'))
+                    fig_pie_uct.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color='#333333'), title=dict(font=dict(size=18)))
                     pie_u2.plotly_chart(fig_pie_uct, use_container_width=True)
                     
                     st.write("#### 📋 Registro Detallado de Clientes con Comentarios (UCT)")
@@ -711,12 +753,13 @@ if not df_ventas_raw.empty:
             st.write("#### ⏱️ Estado Actual vs Objetivo TPA (Global)")
             ct1, ct2 = st.columns(2)
             with ct1:
-                st.plotly_chart(crear_reloj(nps_tpa_actual, "NPS Transaccional TPA (0,8 ptos)", OBJETIVO_NPS_TPA, 100), use_container_width=True)
+                renderizar_cabecera_reloj("NPS Transaccional TPA", f"0,8 ptos | Objetivo: {OBJETIVO_NPS_TPA}%")
+                st.plotly_chart(crear_reloj(nps_tpa_actual, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True)
             with ct2:
                 st.markdown(f'''
-                    <div style="background-color:#F8FAFC; padding:15px; border-radius:8px; border-left:5px solid #3498db; box-shadow:0 1px 3px rgba(0,0,0,0.05); text-align:center; height:100%; display:flex; flex-direction:column; justify-content:center;">
-                        <span style="color:#555; font-size:16px; font-weight:bold;">TOTAL DE ENCUESTAS VÁLIDAS (TPA)</span><br>
-                        <span style="font-size:48px; font-weight:bold; color:#1E3A8A;">{len(df_nps_valid_t)}</span>
+                    <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:1px solid #e6e6e6; border-left:5px solid #1f77b4; box-shadow:0 2px 5px rgba(0,0,0,0.05); text-align:center; height:85%; display:flex; flex-direction:column; justify-content:center;">
+                        <span style="color:#555555; font-size:16px; font-weight:bold;">TOTAL DE ENCUESTAS VÁLIDAS (TPA)</span><br>
+                        <span style="font-size:48px; font-weight:bold; color:#333333;">{len(df_nps_valid_t)}</span>
                     </div>
                 ''', unsafe_allow_html=True)
             
@@ -735,7 +778,8 @@ if not df_ventas_raw.empty:
                     nps_suc = calcular_nps_texto(df_suc['Estado_NPS'])
 
                     with relojes_tpa_cols[idx]:
-                        st.plotly_chart(crear_reloj(nps_suc, f"NPS - {suc}", OBJETIVO_NPS_TPA, 100), use_container_width=True)
+                        renderizar_cabecera_reloj(f"NPS - {suc}", f"Objetivo: {OBJETIVO_NPS_TPA}%")
+                        st.plotly_chart(crear_reloj(nps_suc, OBJETIVO_NPS_TPA, 100, min_val=-100, es_nps=True), use_container_width=True)
 
                     with barras_tpa_cols[idx]:
                         conteo_suc = df_suc['Estado_NPS'].value_counts().reindex(['Detractor', 'Neutro', 'Promotor']).fillna(0).reset_index()
@@ -746,15 +790,14 @@ if not df_ventas_raw.empty:
                             text='Recuento', color_discrete_sequence=['#3498db']
                         )
                         fig_bar_tpa.update_layout(
-                            title=f"Recuento de registros ({suc})",
-                            xaxis_title="",
-                            yaxis_title="Tipo de cliente",
+                            title=dict(text=f"Recuento de registros ({suc})", font=dict(color='#333333')),
                             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                             height=250,
                             margin=dict(l=0, r=0, t=30, b=0),
-                            xaxis=dict(showgrid=True, gridcolor='rgba(128,128,128,0.2)'),
+                            xaxis=dict(title=dict(text="", font=dict(color='#333333')), showgrid=True, gridcolor='#e6e6e6', tickfont=dict(color='#333333')),
+                            yaxis=dict(title=dict(text="Tipo de cliente", font=dict(color='#333333')), tickfont=dict(color='#333333'))
                         )
-                        fig_bar_tpa.update_traces(textposition='outside')
+                        fig_bar_tpa.update_traces(textposition='outside', textfont=dict(color='#333333'))
                         st.plotly_chart(fig_bar_tpa, use_container_width=True)
 
                         with st.expander(f"Ver informe ({suc})"):
@@ -792,11 +835,11 @@ if not df_ventas_raw.empty:
                     pct_ok = (cant_ok / total_scoring * 100) if total_scoring > 0 else 0
                     
                     sc1, sc2, sc3, sc4, sc5 = st.columns(5)
-                    sc1.metric("Total Evaluados", total_scoring)
+                    sc1.metric("Total", total_scoring)
                     sc2.metric("✅ OK", cant_ok)
-                    sc3.metric("⏳ Pendientes", cant_pend)
+                    sc3.metric("⏳ Pend.", cant_pend)
                     sc4.metric("❌ Caídos", cant_caido)
-                    sc5.metric("🎯 % de OK", f"{pct_ok:.1f}%")
+                    sc5.metric("🎯 % OK", f"{pct_ok:.1f}%")
 
                 with col_score_search:
                     busqueda_query = st.text_input("🔍 Buscar Vendedor / Cliente:", placeholder="Escriba aquí...", key="search_tpa_box")
@@ -877,77 +920,195 @@ if not df_ventas_raw.empty:
             nps_t26_global = calcular_nps_texto(df_nps_valid_t26['Estado_NPS'])
 
             st.write("### 📈 Encuestas de Marca (Toyota - TPA26)")
-            st.write("Métricas de satisfacción global y por etapa.")
-
+            
+            # --- RELOJ GLOBAL Y TOTAL DE ENCUESTAS ---
             c1, c2 = st.columns(2)
             with c1:
-                st.plotly_chart(crear_reloj(nps_t26_global, "NPS Transaccional (Global)", OBJETIVO_NPS_T26, 100), use_container_width=True)
+                renderizar_cabecera_reloj("NPS Transaccional (Global)", f"Objetivo: {OBJETIVO_NPS_T26}%")
+                st.plotly_chart(crear_reloj(nps_t26_global, OBJETIVO_NPS_T26, 100, min_val=-100, es_nps=True), use_container_width=True)
             with c2:
                 st.markdown(f'''
-                    <div style="background-color:#F8FAFC; padding:15px; border-radius:8px; border-left:5px solid #3498db; box-shadow:0 1px 3px rgba(0,0,0,0.05); text-align:center; height:100%; display:flex; flex-direction:column; justify-content:center;">
-                        <span style="color:#555; font-size:16px; font-weight:bold;">TOTAL DE ENCUESTAS</span><br>
-                        <span style="font-size:48px; font-weight:bold; color:#1E3A8A;">{len(df_nps_valid_t26)}</span>
+                    <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:1px solid #e6e6e6; border-left:5px solid #1f77b4; box-shadow:0 2px 5px rgba(0,0,0,0.05); text-align:center; height:85%; display:flex; flex-direction:column; justify-content:center;">
+                        <span style="color:#555555; font-size:16px; font-weight:bold;">TOTAL DE ENCUESTAS EVALUADAS</span><br>
+                        <span style="font-size:48px; font-weight:bold; color:#333333;">{len(df_nps_valid_t26)}</span>
                     </div>
                 ''', unsafe_allow_html=True)
             
             st.markdown("---")
-            st.write("#### 📊 Desglose de NPS por Etapa")
             
-            etapas_unicas = [e for e in df_nps_valid_t26['Etapa_Filtro'].unique() if e.lower() != 'nan']
-            
-            if etapas_unicas:
-                relojes_cols = st.columns(len(etapas_unicas))
-                barras_cols = st.columns(len(etapas_unicas))
-                
-                for i, etapa in enumerate(etapas_unicas):
-                    df_etapa = df_nps_valid_t26[df_nps_valid_t26['Etapa_Filtro'] == etapa]
-                    nps_etapa = calcular_nps_texto(df_etapa['Estado_NPS'])
-                    
-                    with relojes_cols[i]:
-                        st.plotly_chart(crear_reloj(nps_etapa, f"NPS - {etapa}", OBJETIVO_NPS_T26, 100), use_container_width=True)
-                        
-                    with barras_cols[i]:
-                        conteo = df_etapa['Estado_NPS'].value_counts().reindex(['Detractor', 'Neutro', 'Promotor']).fillna(0).reset_index()
-                        conteo.columns = ['Tipo de cliente', 'Recuento']
-                        
-                        fig_bar = px.bar(
-                            conteo, x='Recuento', y='Tipo de cliente', orientation='h',
-                            text='Recuento', color_discrete_sequence=['#3498db']
-                        )
-                        fig_bar.update_layout(
-                            title="Recuento de registros",
-                            xaxis_title="",
-                            yaxis_title="Tipo de cliente",
-                            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                            height=250,
-                            margin=dict(l=0, r=0, t=30, b=0),
-                            xaxis=dict(showgrid=True, gridcolor='rgba(128,128,128,0.2)'),
-                        )
-                        fig_bar.update_traces(textposition='outside')
-                        st.plotly_chart(fig_bar, use_container_width=True)
-                        
-                        with st.expander(f"Ver informe ({etapa})"):
-                            cols_to_show_t26 = [col_cliente_t26, col_nota_t26, 'Estado_NPS', 'Comentario_Cliente']
-                            df_tabla_t26 = df_etapa[cols_to_show_t26].copy()
-                            
-                            df_tabla_t26['Orden_Gravedad'] = df_tabla_t26['Estado_NPS'].map({'Detractor': 1, 'Neutro': 2, 'Promotor': 3})
-                            df_tabla_t26 = df_tabla_t26.sort_values(by=['Orden_Gravedad'])
-                            df_tabla_t26 = df_tabla_t26.drop(columns=['Orden_Gravedad'])
-                            
-                            df_tabla_t26 = df_tabla_t26.rename(columns={
-                                col_cliente_t26: 'Nombre del Cliente',
-                                col_nota_t26: 'Nota',
-                                'Estado_NPS': 'Clasificación',
-                                'Comentario_Cliente': 'Comentario'
-                            })
+            # --- 1. EVOLUCIÓN HISTÓRICA POR ETAPA ---
+            st.write("#### 📅 Evolución Histórica del NPS por Etapa")
+            if not df_nps_valid_t26.empty:
+                # Calculamos el NPS y contamos los tipos de clientes por mes y etapa
+                def calcular_metricas_hist(grupo):
+                    prom = (grupo['Estado_NPS'] == 'Promotor').sum()
+                    neu = (grupo['Estado_NPS'] == 'Neutro').sum()
+                    det = (grupo['Estado_NPS'] == 'Detractor').sum()
+                    nps = calcular_nps_texto(grupo['Estado_NPS'])
+                    return pd.Series({'NPS': nps, 'Promotores': prom, 'Neutros': neu, 'Detractores': det})
 
-                            def color_clasificacion_t26(val):
-                                if val == 'Detractor': return 'color: #e74c3c; font-weight: bold;'
-                                elif val == 'Promotor': return 'color: #2ecc71; font-weight: bold;'
-                                elif val == 'Neutro': return 'color: #f1c40f; font-weight: bold;'
-                                return ''
-                                
-                            st.dataframe(df_tabla_t26.style.map(color_clasificacion_t26, subset=['Clasificación']), use_container_width=True, hide_index=True)
+                df_evo_t26 = df_nps_valid_t26.groupby(['Mes_Num', 'Mes_Filtro', 'Etapa_Filtro']).apply(calcular_metricas_hist).reset_index()
+                df_evo_t26 = df_evo_t26.sort_values('Mes_Num')
+
+                fig_evo_t26 = px.line(
+                    df_evo_t26, x='Mes_Filtro', y='NPS', color='Etapa_Filtro', markers=True,
+                    text='NPS', # Activa las etiquetas de datos en la línea
+                    title='Tendencia Mensual de NPS según Etapa de Plan de Ahorro',
+                    labels={'Mes_Filtro': 'Mes de Encuesta', 'NPS': 'NPS (%)', 'Etapa_Filtro': 'Etapa'},
+                    custom_data=['Promotores', 'Neutros', 'Detractores'] # Pasa los datos extra al tooltip
+                )
+                
+                # Configuramos el formato visual de la etiqueta y el cuadro emergente (hover)
+                fig_evo_t26.update_traces(
+                    texttemplate='<b>%{text:.1f}%</b>',
+                    textposition='top center',
+                    textfont=dict(size=11, color='#333333'),
+                    hovertemplate=(
+                        "<b>Mes:</b> %{x}<br>"
+                        "<b>NPS:</b> %{y:.1f}%<br>"
+                        "🟢 <b>Promotores:</b> %{customdata[0]}<br>"
+                        "🟡 <b>Neutros:</b> %{customdata[1]}<br>"
+                        "🔴 <b>Detractores:</b> %{customdata[2]}<br>"
+                        "<extra></extra>"
+                    )
+                )
+
+                fig_evo_t26.add_hline(y=OBJETIVO_NPS_T26, line_dash="dot", line_color="#E3000F", annotation_text=f"Objetivo ({OBJETIVO_NPS_T26}%)", annotation_position="bottom right")
+                
+                # Ajustamos el margen superior para que los porcentajes no queden cortados
+                fig_evo_t26.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)", 
+                    plot_bgcolor="rgba(0,0,0,0)", 
+                    font=dict(color='#333333'), 
+                    yaxis=dict(range=[-100, 115], zeroline=True, zerolinecolor='#cccccc'),
+                    margin=dict(t=60)
+                )
+                st.plotly_chart(fig_evo_t26, use_container_width=True)
+
+            # --- 2. CUADRO RESUMEN: NPS Y TIPO DE CLIENTES ---
+            st.write("#### 📊 Cuadro Resumen: NPS y Tipos de Cliente por Etapa")
+            if not df_nps_valid_t26.empty:
+                resumen_t26 = []
+                for etapa, grupo in df_nps_valid_t26.groupby('Etapa_Filtro'):
+                    prom = (grupo['Estado_NPS'] == 'Promotor').sum()
+                    neu = (grupo['Estado_NPS'] == 'Neutro').sum()
+                    det = (grupo['Estado_NPS'] == 'Detractor').sum()
+                    nps_etapa = calcular_nps_texto(grupo['Estado_NPS'])
+                    resumen_t26.append({
+                        'Etapa del Plan': etapa,
+                        'Total Encuestas': len(grupo),
+                        'Promotores 🟢': prom,
+                        'Neutros 🟡': neu,
+                        'Detractores 🔴': det,
+                        'NPS Resultante': nps_etapa
+                    })
+                
+                df_resumen_t26 = pd.DataFrame(resumen_t26).sort_values('NPS Resultante', ascending=False)
+                st.dataframe(
+                    df_resumen_t26.style.format({'NPS Resultante': '{:.1f}%'})
+                    .map(lambda val: 'color: #2ecc71; font-weight: bold;' if pd.notna(val) and val >= OBJETIVO_NPS_T26 else 'color: #e74c3c; font-weight: bold;', subset=['NPS Resultante']),
+                    use_container_width=True, hide_index=True
+                )
+
+            st.markdown("---")
+            
+            # --- 3. ANÁLISIS DE COMENTARIOS POR TIPO DE CLIENTE ---
+            st.write("#### 🧠 Análisis de Comentarios por Tipo de Cliente")
+            st.caption("Categorización automática basada en palabras clave de los comentarios registrados.")
+
+            # Función de categorización por NLP (Keywords)
+            def categorizar_comentario(comentario):
+                if pd.isna(comentario): return "Sin comentarios"
+                c = str(comentario).lower()
+                if c == "sin comentarios" or len(c.strip()) < 4: return "Sin comentarios"
+
+                if any(w in c for w in ['demora', 'tiempo', 'tarde', 'espera', 'meses', 'retraso', 'lento']): return "Demora en entrega/procesos"
+                elif any(w in c for w in ['cuota', 'precio', 'aumento', 'caro', 'plata', 'factura', 'cobro', 'pago', 'dinero']): return "Cuotas y Precios"
+                elif any(w in c for w in ['atencion', 'atención', 'asesor', 'vendedor', 'comunicacion', 'comunicación', 'respuesta', 'explicacion', 'informacion', 'información']): return "Atención y Comunicación"
+                elif any(w in c for w in ['tramite', 'papeles', 'firma', 'administrativo', 'patentamiento', 'gestoria']): return "Gestión Administrativa"
+                elif any(w in c for w in ['sorteo', 'licitacion', 'licitación', 'adjudicacion', 'adjudicación', 'salir sorteado']): return "Sorteo y Licitación"
+                elif any(w in c for w in ['taller', 'repuesto', 'service', 'garantia', 'falla', 'roto', 'arreglo']): return "Posventa y Unidad"
+                else: return "Comentario General / Otros"
+
+            # Aplicar categorización
+            df_nps_valid_t26['Motivo_Reclamo'] = df_nps_valid_t26['Comentario_Cliente'].apply(categorizar_comentario)
+            
+            # Filtrar los que tienen comentarios reales
+            df_con_comentarios = df_nps_valid_t26[df_nps_valid_t26['Motivo_Reclamo'] != 'Sin comentarios'].copy()
+
+            if not df_con_comentarios.empty:
+                # Separar los DataFrames por tipo de cliente
+                df_negativos = df_con_comentarios[df_con_comentarios['Estado_NPS'].isin(['Detractor', 'Neutro'])].copy()
+                df_positivos = df_con_comentarios[df_con_comentarios['Estado_NPS'] == 'Promotor'].copy()
+
+                col_izq, col_der = st.columns(2)
+
+                def color_estado(val):
+                    if val == 'Detractor': return 'color: #e74c3c; font-weight: bold;'
+                    elif val == 'Promotor': return 'color: #2ecc71; font-weight: bold;'
+                    elif val == 'Neutro': return 'color: #f1c40f; font-weight: bold;'
+                    return ''
+
+                # --- LADO IZQUIERDO: DETRACTORES Y NEUTROS ---
+                with col_izq:
+                    st.markdown("##### 😒😐 Detractores y Neutros")
+                    if not df_negativos.empty:
+                        # Gráfico
+                        cat_counts_neg = df_negativos['Motivo_Reclamo'].value_counts().reset_index()
+                        cat_counts_neg.columns = ['Categoría', 'Frecuencia']
+                        fig_neg = px.bar(
+                            cat_counts_neg, x='Frecuencia', y='Categoría', orientation='h', 
+                            color_discrete_sequence=['#e74c3c'], height=250
+                        )
+                        fig_neg.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", 
+                            yaxis={'categoryorder':'total ascending', 'title': ''}, 
+                            xaxis={'title': '', 'showticklabels': False},
+                            font=dict(color='#333333'), margin=dict(l=0, r=0, t=10, b=0)
+                        )
+                        fig_neg.update_traces(texttemplate='<b>%{x}</b>', textposition='outside')
+                        st.plotly_chart(fig_neg, use_container_width=True)
+
+                        # Tabla (ocultamos 'Etapa' para que entre mejor en media pantalla)
+                        df_tabla_neg = df_negativos[[col_cliente_t26, 'Estado_NPS', 'Motivo_Reclamo', 'Comentario_Cliente']].copy()
+                        df_tabla_neg.columns = ['Cliente', 'Estado', 'Motivo', 'Comentario Textual']
+                        df_tabla_neg['Orden'] = df_tabla_neg['Estado'].map({'Detractor': 1, 'Neutro': 2})
+                        df_tabla_neg = df_tabla_neg.sort_values(['Orden']).drop(columns=['Orden'])
+                        
+                        st.dataframe(df_tabla_neg.style.map(color_estado, subset=['Estado']), use_container_width=True, hide_index=True)
+                    else:
+                        st.success("¡Excelente! No hay comentarios de detractores o neutros.")
+
+                # --- LADO DERECHO: PROMOTORES ---
+                with col_der:
+                    st.markdown("##### 😁 Promotores")
+                    if not df_positivos.empty:
+                        # Gráfico
+                        cat_counts_pos = df_positivos['Motivo_Reclamo'].value_counts().reset_index()
+                        cat_counts_pos.columns = ['Categoría', 'Frecuencia']
+                        fig_pos = px.bar(
+                            cat_counts_pos, x='Frecuencia', y='Categoría', orientation='h', 
+                            color_discrete_sequence=['#2ecc71'], height=250
+                        )
+                        fig_pos.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", 
+                            yaxis={'categoryorder':'total ascending', 'title': ''}, 
+                            xaxis={'title': '', 'showticklabels': False},
+                            font=dict(color='#333333'), margin=dict(l=0, r=0, t=10, b=0)
+                        )
+                        fig_pos.update_traces(texttemplate='<b>%{x}</b>', textposition='outside')
+                        st.plotly_chart(fig_pos, use_container_width=True)
+
+                        # Tabla
+                        df_tabla_pos = df_positivos[[col_cliente_t26, 'Estado_NPS', 'Motivo_Reclamo', 'Comentario_Cliente']].copy()
+                        df_tabla_pos.columns = ['Cliente', 'Estado', 'Motivo', 'Comentario Textual']
+                        
+                        st.dataframe(df_tabla_pos.style.map(color_estado, subset=['Estado']), use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Aún no hay comentarios de promotores.")
+            else:
+                st.info("No hay clientes con comentarios textuales para analizar en este período.")
+
         else:
             st.warning("No se pudo cargar la hoja TPA26. Verifica que existan las columnas indicadas.")
 
@@ -1010,14 +1171,15 @@ if not df_ventas_raw.empty:
                         color_discrete_sequence=px.colors.qualitative.Set1
                     )
                     
-                    fig_myst.update_traces(texttemplate='<b>%{text:.1f}%</b>', textposition='outside')
+                    fig_myst.update_traces(texttemplate='<b>%{text:.1f}%</b>', textposition='outside', textfont=dict(color='#333333'))
                     fig_myst.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)", 
-                        plot_bgcolor="rgba(0,0,0,0)", 
-                        font=dict(color='white'),
-                        yaxis=dict(range=[0, max(100, df_myst_agrupado['Resultado_Num'].max() * 1.2)], zeroline=False),
-                        xaxis=dict(showgrid=False),
-                        margin=dict(t=50, b=50)
+                        paper_bgcolor="white", 
+                        plot_bgcolor="white", 
+                        font=dict(color='#333333', size=14),
+                        yaxis=dict(title=dict(text="Resultado Promedio (%)", font=dict(color='#333333')), range=[0, max(100, df_myst_agrupado['Resultado_Num'].max() * 1.2)], zeroline=False, tickfont=dict(color='#333333')),
+                        xaxis=dict(title=dict(text="Punto de Venta", font=dict(color='#333333')), showgrid=False, tickfont=dict(color='#333333')),
+                        margin=dict(t=50, b=50),
+                        legend=dict(font=dict(color='#333333'))
                     )
                     st.plotly_chart(fig_myst, use_container_width=True)
                     
