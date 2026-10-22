@@ -461,7 +461,7 @@ if not df_ventas_raw.empty:
             st.plotly_chart(fig_ranking, use_container_width=True)
 
         # -------------------------------------------------------------
-       # -------------------------------------------------------------
+# -------------------------------------------------------------
         # NUEVA SECCIÓN: EFECTIVIDAD DE ENCUESTAS
         # -------------------------------------------------------------
         st.markdown("---")
@@ -481,14 +481,15 @@ if not df_ventas_raw.empty:
             # Dejamos únicamente los estados que nos interesan (OK y SE)
             df_ef = df_ef[df_ef['Estado_Clean'].isin(['OK', 'SE'])]
             
-            # Tratamiento de fechas para poder filtrar por período (Mes)
-            try:
-                df_ef['Fecha_DT'] = pd.to_datetime(df_ef[col_fecha_ef], errors='coerce')
-                df_ef['Mes_Período'] = df_ef['Fecha_DT'].dt.strftime('%Y-%m')
-            except:
-                df_ef['Mes_Período'] = df_ef[col_fecha_ef].astype(str)
+            # CORRECCIÓN DE FECHAS: Agregamos dayfirst=True para formato latino (DD/MM/YYYY)
+            df_ef['Fecha_DT'] = pd.to_datetime(df_ef[col_fecha_ef], errors='coerce', dayfirst=True)
+            df_ef['Mes_Período'] = df_ef['Fecha_DT'].dt.strftime('%Y-%m')
+            
+            # Si alguna fecha viene en un texto raro o está vacía, no la borramos, la marcamos
+            df_ef['Mes_Período'] = df_ef['Mes_Período'].fillna(df_ef[col_fecha_ef].astype(str))
+            df_ef['Mes_Período'] = df_ef['Mes_Período'].replace(['nan', 'NaT', 'None', ''], 'Sin Fecha')
                 
-            meses_disp_ef = sorted(df_ef['Mes_Período'].dropna().unique().tolist())
+            meses_disp_ef = sorted(df_ef['Mes_Período'].unique().tolist())
             sucursales_disp_ef = sorted(df_ef[col_suc_ef].dropna().astype(str).unique().tolist())
             asesores_disp_ef = sorted(df_ef[col_asesor_ef].dropna().astype(str).unique().tolist())
             
@@ -535,14 +536,9 @@ if not df_ventas_raw.empty:
                 ''', unsafe_allow_html=True)
                 
                 # --- GRÁFICO APILADO POR ASESOR ---
-                # Agrupamos por Asesor y Estado para contar frecuencias
                 agrupado_ef = df_ef_filt.groupby([col_asesor_ef, 'Estado_Clean']).size().reset_index(name='Cantidad')
-                
-                # Calculamos el total por asesor para sacar el %
                 totales_asesor = agrupado_ef.groupby(col_asesor_ef)['Cantidad'].transform('sum')
                 agrupado_ef['Porcentaje'] = (agrupado_ef['Cantidad'] / totales_asesor) * 100
-                
-                # Ordenamos la data para la gráfica
                 agrupado_ef = agrupado_ef.sort_values(['Porcentaje'], ascending=False)
                 
                 fig_efectividad = px.bar(
@@ -565,7 +561,6 @@ if not df_ventas_raw.empty:
                 )
                 
                 fig_efectividad.update_traces(textposition='inside', textfont=dict(color='white', size=12))
-                
                 st.plotly_chart(fig_efectividad, use_container_width=True)
             else:
                 st.info("No hay datos de efectividad para los filtros seleccionados.")
