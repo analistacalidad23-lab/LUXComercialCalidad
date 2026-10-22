@@ -461,6 +461,7 @@ if not df_ventas_raw.empty:
             st.plotly_chart(fig_ranking, use_container_width=True)
 
         # -------------------------------------------------------------
+       # -------------------------------------------------------------
         # NUEVA SECCIÓN: EFECTIVIDAD DE ENCUESTAS
         # -------------------------------------------------------------
         st.markdown("---")
@@ -477,10 +478,10 @@ if not df_ventas_raw.empty:
             df_ef = df_efectividad_raw.copy()
             df_ef['Estado_Clean'] = df_ef[col_estado_ef].astype(str).str.strip().str.upper()
             
-            # Dejamos únicamente los estados que nos interesan
+            # Dejamos únicamente los estados que nos interesan (OK y SE)
             df_ef = df_ef[df_ef['Estado_Clean'].isin(['OK', 'SE'])]
             
-            # Tratamiento de fechas para poder filtrar por período
+            # Tratamiento de fechas para poder filtrar por período (Mes)
             try:
                 df_ef['Fecha_DT'] = pd.to_datetime(df_ef[col_fecha_ef], errors='coerce')
                 df_ef['Mes_Período'] = df_ef['Fecha_DT'].dt.strftime('%Y-%m')
@@ -496,20 +497,44 @@ if not df_ventas_raw.empty:
             st.write("#### 🔍 Filtros de Efectividad")
             f_ef1, f_ef2, f_ef3 = st.columns(3)
             with f_ef1:
-                meses_sel_ef = st.multiselect("Filtrar por Período:", meses_disp_ef, default=meses_disp_ef, key="f_mes_ef")
+                meses_sel_ef = st.multiselect("Filtrar por Mes:", meses_disp_ef, default=meses_disp_ef, key="f_mes_ef")
             with f_ef2:
                 suc_sel_ef = st.multiselect("Filtrar por Sucursal:", sucursales_disp_ef, default=sucursales_disp_ef, key="f_suc_ef")
             with f_ef3:
                 asesor_sel_ef = st.multiselect("Filtrar por Asesor:", asesores_disp_ef, default=asesores_disp_ef, key="f_ase_ef")
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Aplicar filtros
+            # Aplicar filtros al DataFrame
             df_ef_filt = df_ef.copy()
             if meses_sel_ef: df_ef_filt = df_ef_filt[df_ef_filt['Mes_Período'].isin(meses_sel_ef)]
             if suc_sel_ef: df_ef_filt = df_ef_filt[df_ef_filt[col_suc_ef].astype(str).isin(suc_sel_ef)]
             if asesor_sel_ef: df_ef_filt = df_ef_filt[df_ef_filt[col_asesor_ef].astype(str).isin(asesor_sel_ef)]
             
             if not df_ef_filt.empty:
+                # --- INDICADOR DE EFECTIVIDAD GLOBAL/FILTRADA ---
+                total_registros = len(df_ef_filt)
+                total_ok = len(df_ef_filt[df_ef_filt['Estado_Clean'] == 'OK'])
+                total_se = len(df_ef_filt[df_ef_filt['Estado_Clean'] == 'SE'])
+                pct_efectividad_global = (total_ok / total_registros) * 100 if total_registros > 0 else 0
+                
+                st.markdown(f'''
+                    <div style="display:flex; justify-content: space-around; background-color:#ffffff; padding:15px; border-radius:8px; border:1px solid #e6e6e6; box-shadow:0 2px 5px rgba(0,0,0,0.05); text-align:center; margin-bottom: 25px;">
+                        <div>
+                            <span style="color:#555555; font-size:14px; font-weight:bold;">TOTAL ENTREGAS (BASE)</span><br>
+                            <span style="font-size:32px; font-weight:bold; color:#333333;">{total_registros}</span>
+                        </div>
+                        <div>
+                            <span style="color:#555555; font-size:14px; font-weight:bold;">ENCUESTAS LOGRADAS (OK)</span><br>
+                            <span style="font-size:32px; font-weight:bold; color:#2ecc71;">{total_ok}</span>
+                        </div>
+                        <div style="border-left: 3px solid #1f77b4; padding-left: 40px;">
+                            <span style="color:#555555; font-size:14px; font-weight:bold;">% EFECTIVIDAD RESULTANTE</span><br>
+                            <span style="font-size:32px; font-weight:bold; color:#1f77b4;">{pct_efectividad_global:.1f}%</span>
+                        </div>
+                    </div>
+                ''', unsafe_allow_html=True)
+                
+                # --- GRÁFICO APILADO POR ASESOR ---
                 # Agrupamos por Asesor y Estado para contar frecuencias
                 agrupado_ef = df_ef_filt.groupby([col_asesor_ef, 'Estado_Clean']).size().reset_index(name='Cantidad')
                 
@@ -535,7 +560,7 @@ if not df_ventas_raw.empty:
                     xaxis=dict(title=dict(text="Asesor", font=dict(color='#333333')), tickfont=dict(color='#333333')), 
                     yaxis=dict(title=dict(text="Porcentaje (%)", font=dict(color='#333333')), tickfont=dict(color='#333333'), range=[0, 100]),
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    legend_title_text="Estado de la Encuesta",
+                    legend_title_text="Estado (Col K)",
                     margin=dict(t=40, b=40)
                 )
                 
@@ -546,7 +571,6 @@ if not df_ventas_raw.empty:
                 st.info("No hay datos de efectividad para los filtros seleccionados.")
         else:
             st.warning("No se pudo cargar la hoja EFECTIVIDAD o no posee las columnas necesarias (E, H, I, K).")
-
     # --- PESTAÑA 3: COMISIONES (0KM & TPA) ---
     with tab_comisiones:
         st.markdown('<div class="sticky-filters">', unsafe_allow_html=True)
