@@ -459,8 +459,6 @@ if not df_ventas_raw.empty:
                 margin=dict(l=150, r=50, t=40, b=40)
             )
             st.plotly_chart(fig_ranking, use_container_width=True)
-
-        # -------------------------------------------------------------
 # -------------------------------------------------------------
         # NUEVA SECCIÓN: EFECTIVIDAD DE ENCUESTAS
         # -------------------------------------------------------------
